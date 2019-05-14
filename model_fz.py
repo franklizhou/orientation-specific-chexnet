@@ -74,7 +74,8 @@ def train_model(
         dataset,
         data_transforms,
         PATH_TO_IMAGES,
-        PATH_TO_CSV):
+        PATH_TO_CSV,
+        val_on_train=False):
     """
     Fine tunes torchvision model to NIH CXR data.
 
@@ -93,6 +94,7 @@ def train_model(
 
     """
     since = time.time()
+    
 
     start_epoch = 1
     best_loss = 999999
@@ -100,6 +102,15 @@ def train_model(
     best_epoch = -1
     last_train_loss = -1
     last_val_acc = 0
+    
+    if val_on_train:
+        print("WARNING: VALIDATING ON TRAIN SET")
+        with open("results/logger", 'a') as logfile:
+            logfile.write("WARNING: VALIDATING ON TRAIN SET\n")
+            
+    print(time.strftime("%d %b %Y %H:%M:%S", time.gmtime(time.time()-25200)))
+    with open("results/logger", 'a') as logfile:
+        logfile.write(time.strftime("%d %b %Y %H:%M:%S\n", time.gmtime(time.time()-25200)))
 
     # iterate over epochs
     for epoch in range(start_epoch, num_epochs + 1):
@@ -144,6 +155,10 @@ def train_model(
                 running_loss += loss.data.item() * batch_size
 
             epoch_loss = running_loss / dataset_sizes[phase]
+            
+            print(time.strftime("%d %b %Y %H:%M:%S", time.gmtime(time.time()-25200)))
+            with open("results/logger", 'a') as logfile:
+                logfile.write(time.strftime("%d %b %Y %H:%M:%S\n", time.gmtime(time.time()-25200)))
 
             print(phase + ' epoch {}: loss {:.4f} with data size {}'.format(
                 epoch, epoch_loss, dataset_sizes[phase]))
@@ -162,10 +177,12 @@ def train_model(
                 last_train_loss = epoch_loss
                 
             if phase == 'val':
-                _, metric = E.make_pred_multilabel(data_transforms, model, 
-                                                   PATH_TO_IMAGES, PATH_TO_CSV, 
-                                                   #'auc')
-                                                   'auc', dataset=dataset)
+                if val_on_train:
+                    _, metric = E.make_pred_multilabel(data_transforms, model, 
+                                                       PATH_TO_IMAGES, PATH_TO_CSV, 'auc', dataset=dataset)
+                else:
+                    _, metric = E.make_pred_multilabel(data_transforms, model, 
+                                                       PATH_TO_IMAGES, PATH_TO_CSV, 'auc')
                 
                 auc = metric.as_matrix(columns=metric.columns[1:])
                 last_val_acc = auc[~np.isnan(auc)].mean() 
@@ -364,7 +381,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, NUM_IMAGES=223414, 
         path_to_images=PATH_TO_IMAGES,
         path_to_csv=PATH_TO_CSV,
         fold='train',
-        uncertain = 'zeros',
+        uncertain = 'ones',
         transform=data_transforms['train'],
         sample = NUM_IMAGES,
         verbose = True
@@ -438,7 +455,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, NUM_IMAGES=223414, 
     model, best_epoch = train_model(model, criterion, optimizer, LR, num_epochs=NUM_EPOCHS,
                                     dataloaders=dataloaders, dataset_sizes=dataset_sizes, weight_decay=WEIGHT_DECAY, 
                                     dataset=transformed_datasets['train'], data_transforms=data_transforms, 
-                                    PATH_TO_IMAGES=PATH_TO_IMAGES, PATH_TO_CSV=PATH_TO_CSV)
+                                    PATH_TO_IMAGES=PATH_TO_IMAGES, PATH_TO_CSV=PATH_TO_CSV, val_on_train=False)
     
     print("Model training complete")
 
