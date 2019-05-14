@@ -12,12 +12,19 @@ class CXPDataset(Dataset):
             path_to_images,
             path_to_csv,
             fold,
+            uncertain=None,
             transform=None,
             sample=0,
             finding="any",
             starter_images=False,
             verbose = False):
-
+       
+        if uncertain not in [None, 'zeros', 'ones', 'self', 'multiclass']:
+            print('Invalid uncertain strategy:', uncertain)
+            with open("results/logger", 'a') as logfile:
+                logfile.write('Invalid uncertain strategy: ' + uncertain + '\n')
+            return
+        
         self.transform = transform
         self.path_to_images = path_to_images
         self.path_to_csv = path_to_csv
@@ -28,20 +35,38 @@ class CXPDataset(Dataset):
         elif fold == "val":
             #print('cxp_dataset: ' + path_to_csv + 'valid.csv')
             self.df = pd.read_csv(path_to_csv + 'valid.csv')
+        elif fold == "traintest":
+            self.df = pd.read_csv(path_to_csv + 'traintest.csv')
         
         # blanks in dataframe assumed to be negative class    
         self.df.fillna(0, inplace=True)
-        
-        # make all uncertains true for now
-        #print("Uncertain labels are own class")
-        #self.df.replace(to_replace=-1, value=2, inplace=True)
-        
-        #print("Uncertain labels are positive")
-        #self.df.replace(to_replace=-1, value=1, inplace=True)
 
-        if verbose == True:
-            print("Uncertain labels are negative")
-        self.df.replace(to_replace=-1, value=0, inplace=True)
+        if uncertain == None:
+            if verbose == True:
+                print("Using no uncertain labeling")
+                with open("results/logger", 'a') as logfile:
+                    logfile.write("Using no uncertain labeling\n")
+        
+        if uncertain == 'zeros':
+            if verbose == True:
+                print("Uncertain labels are negative")
+                with open("results/logger", 'a') as logfile:
+                    logfile.write("Uncertain labels are negative\n")
+            self.df.replace(to_replace=-1, value=0, inplace=True)
+            
+        if uncertain == 'ones':
+            if verbose == True:
+                print("Uncertain labels are positive")
+                with open("results/logger", 'a') as logfile:
+                    logfile.write("Uncertain labels are positive\n")
+            self.df.replace(to_replace=-1, value=1, inplace=True)
+            
+        if uncertain == 'multiclass':
+            if verbose == True:
+                print("Uncertain labels are own class")
+                with open("results/logger", 'a') as logfile:
+                    logfile.write("Uncertain labels are own class\n")
+            self.df.replace(to_replace=-1, value=2, inplace=True)
         
         if(starter_images):
             starter_images = pd.read_csv("starter_images.csv")

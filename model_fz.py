@@ -71,7 +71,6 @@ def train_model(
         dataloaders,
         dataset_sizes,
         weight_decay,
-        logger,
         dataset,
         data_transforms,
         PATH_TO_IMAGES,
@@ -107,8 +106,9 @@ def train_model(
         print('Epoch {}/{}'.format(epoch, num_epochs))
         print('-' * 10)
         
-        logger.append('Epoch {}/{}'.format(epoch, num_epochs))
-        logger.append('-' * 10)
+        with open("results/logger", 'a') as logfile:
+            logfile.write('Epoch {}/{}\n'.format(epoch, num_epochs))
+            logfile.write('-' * 10 + '\n')
 
         # set model to train or eval mode based on whether we are in train or
         # val; necessary to get correct predictions given batchnorm
@@ -147,14 +147,16 @@ def train_model(
 
             print(phase + ' epoch {}: loss {:.4f} with data size {}'.format(
                 epoch, epoch_loss, dataset_sizes[phase]))
-            logger.append(phase + ' epoch {}: loss {:.4f} with data size {}'.format(
+            with open("results/logger", 'a') as logfile:
+                logfile.write(phase + ' epoch {}: loss {:.4f} with data size {}\n'.format(
                 epoch, epoch_loss, dataset_sizes[phase]))
             
             time_elapsed = time.time() - since
             print(phase + ' epoch complete in {:.0f}m {:.0f}s'.format(
                 time_elapsed // 60, time_elapsed % 60))
-            logger.append(phase + ' epoch complete in {:.0f}m {:.0f}s'.format(
-                time_elapsed // 60, time_elapsed % 60))   
+            with open("results/logger", 'a') as logfile:
+                logfile.write(phase + ' epoch complete in {:.0f}m {:.0f}s\n'.format(
+                time_elapsed // 60, time_elapsed % 60))
             
             if phase == 'train':
                 last_train_loss = epoch_loss
@@ -162,16 +164,19 @@ def train_model(
             if phase == 'val':
                 _, metric = E.make_pred_multilabel(data_transforms, model, 
                                                    PATH_TO_IMAGES, PATH_TO_CSV, 
-                                                   'auc')
-                                                   #'auc', dataset=dataset)
+                                                   #'auc')
+                                                   'auc', dataset=dataset)
                 
                 auc = metric.as_matrix(columns=metric.columns[1:])
                 last_val_acc = auc[~np.isnan(auc)].mean() 
                 
-                print(auc)
+                print(metric)
+                with open("results/logger", 'a') as logfile:
+                    print(metric, file=logfile)
                 
                 print('mean epoch validation accuracy:', last_val_acc)
-                logger.append('mean epoch validation accuracy: ' + str(last_val_acc))
+                with open("results/logger", 'a') as logfile:
+                    logfile.write('mean epoch validation accuracy: ' + str(last_val_acc) + '\n')
 
 #             # decay learning rate if no train loss improvement in this epoch
 #             if phase == 'train' and epoch_loss > best_loss:
@@ -197,11 +202,15 @@ def train_model(
 #                 checkpoint(model, best_loss, epoch, LR)
                 
             # decay learning rate if no val accuracy improvement in this epoch
-            if phase == 'val' and last_val_acc < best_val_acc and epoch >= best_epoch + 3:
+            if phase == 'val' and last_val_acc < best_val_acc and epoch >= best_epoch + 2:
                 print("Running with LR decay on val accuracy")
-                logger.append("Running with LR decay on val accuracy")
+                with open("results/logger", 'a') as logfile:
+                    logfile.write("Running with LR decay on val accuracy\n")
                 print("decay loss from " + str(LR) + " to " +
                       str(LR / 10) + " as not seeing improvement in val accuracy")
+                with open("results/logger", 'a') as logfile:
+                    logfile.write("decay loss from " + str(LR) + " to " +
+                      str(LR / 10) + " as not seeing improvement in val accuracy\n")
                 LR = LR / 10
                 # create new optimizer with lower learning rate
 #                 optimizer = optim.SGD(
@@ -221,6 +230,8 @@ def train_model(
                     weight_decay=weight_decay)
                 
                 print("created new optimizer with LR " + str(LR))
+                with open("results/logger", 'a') as logfile:
+                        logfile.write("created new optimizer with LR " + str(LR) + '\n')
 
             # keep track of best train loss
             if phase == 'train' and epoch_loss < best_loss:
@@ -233,7 +244,8 @@ def train_model(
                 
             if phase == 'val':
                 print('saving checkpoint_' + str(epoch))
-                logger.append('saving checkpoint_' + str(epoch))
+                with open("results/logger", 'a') as logfile:
+                    logfile.write('saving checkpoint_' + str(epoch) + '\n')
                 checkpoint(model, last_train_loss, last_val_acc, metric, epoch, best_epoch, LR, weight_decay)
 
             # log training and validation loss over each epoch
@@ -245,29 +257,35 @@ def train_model(
                     logwriter.writerow([epoch, last_train_loss, epoch_loss, last_val_acc])
 
         print("best epoch: ", best_epoch)
-        logger.append("best epoch: " + str(best_epoch))
+        with open("results/logger", 'a') as logfile:
+            logfile.write("best epoch: " + str(best_epoch) + '\n')
                     
         print("best train loss: ", best_loss)
-        logger.append("best train loss: " + str(best_loss))
+        with open("results/logger", 'a') as logfile:
+            logfile.write("best train loss: " + str(best_loss) + '\n')
         
         print("best val accuracy: ", best_val_acc)
-        logger.append("best val accuracy: " + str(best_val_acc))
+        with open("results/logger", 'a') as logfile:
+            logfile.write("best val accuracy: " + str(best_val_acc) + '\n')
                     
         total_done += batch_size
         if(total_done % (100 * batch_size) == 0):
             print("completed " + str(total_done) + " so far in epoch")
-            logger.append("completed " + str(total_done) + " so far in epoch")
+            with open("results/logger", 'a') as logfile:
+                logfile.write("completed " + str(total_done) + " so far in epoch\n")
 
-        # break if no val loss improvement in 3 epochs
-        if ((epoch - best_epoch) >= 5):
-            print("no improvement in 3 epochs, break")
-            logger.append("no improvement in 3 epochs, break")
+        # break if no val loss improvement in 4 epochs
+        if ((epoch - best_epoch) >= 4):
+            print("no improvement in 4 epochs, break")
+            with open("results/logger", 'a') as logfile:
+                logfile.write("no improvement in 4 epochs, break\n")
             break
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
-    logger.append('Training complete in {:.0f}m {:.0f}s'.format(
+    with open("results/logger", 'a') as logfile:
+        logfile.write('Training complete in {:.0f}m {:.0f}s\n'.format(
         time_elapsed // 60, time_elapsed % 60))
 
     # load best model weights to return
@@ -277,7 +295,7 @@ def train_model(
     return model, best_epoch
 
 
-def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, LOGGER, NUM_IMAGES=223414, PATH_TO_CHECKPOINT=None):
+def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, NUM_IMAGES=223414, PATH_TO_CHECKPOINT=None):
     """
     Train torchvision model to NIH data given high level hyperparameters.
 
@@ -292,11 +310,6 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, LOGGER, NUM_IMAGES=
 
     """
     
-    print("Running with WD, LR:", WEIGHT_DECAY, LR)
-    
-    NUM_EPOCHS = 100
-    BATCH_SIZE = 16
-
     try:
         if os.path.exists('results/'):
             print("Remove or rename results directory")
@@ -306,6 +319,17 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, LOGGER, NUM_IMAGES=
     except BaseException:
         pass  # directory doesn't yet exist, no need to clear it
     os.makedirs("results/")
+    
+    
+    NUM_EPOCHS = 100
+    BATCH_SIZE = 16
+    
+    
+    print("Running with WD, LR:", WEIGHT_DECAY, LR)
+    
+    with open("results/logger", 'a') as logfile:
+        logfile.write("Running with WD, LR:" + str(WEIGHT_DECAY) + ' ' + str(LR) + '\n')
+
     
     out = []
 
@@ -340,6 +364,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, LOGGER, NUM_IMAGES=
         path_to_images=PATH_TO_IMAGES,
         path_to_csv=PATH_TO_CSV,
         fold='train',
+        uncertain = 'zeros',
         transform=data_transforms['train'],
         sample = NUM_IMAGES,
         verbose = True
@@ -349,6 +374,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, LOGGER, NUM_IMAGES=
         path_to_csv=PATH_TO_CSV,
         fold='val',
         transform=data_transforms['val'],
+        verbose = True
     )
     
     print("Size of train set:", len(transformed_datasets['train']))
@@ -411,7 +437,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, LOGGER, NUM_IMAGES=
     # train model
     model, best_epoch = train_model(model, criterion, optimizer, LR, num_epochs=NUM_EPOCHS,
                                     dataloaders=dataloaders, dataset_sizes=dataset_sizes, weight_decay=WEIGHT_DECAY, 
-                                    logger=LOGGER, dataset=transformed_datasets['train'], data_transforms=data_transforms, 
+                                    dataset=transformed_datasets['train'], data_transforms=data_transforms, 
                                     PATH_TO_IMAGES=PATH_TO_IMAGES, PATH_TO_CSV=PATH_TO_CSV)
     
     print("Model training complete")
