@@ -12,3 +12,4 @@ dependencies:
   - seaborn = 0.8.1
   - jupyterlab
   - ipykernel = 4.8.2
+  - pytorch = 0.4.1

@@ -125,7 +125,7 @@ def train_model(
                     loss.backward()
                     optimizer.step()
 
-                running_loss += loss.data[0] * batch_size
+                running_loss += loss.item() * batch_size
 
             epoch_loss = running_loss / dataset_sizes[phase]
 
@@ -134,6 +134,10 @@ def train_model(
 
             print(phase + ' epoch {}:loss {:.4f} with data size {}'.format(
                 epoch, epoch_loss, dataset_sizes[phase]))
+            
+            time_elapsed = time.time() - since
+            print('Epoch complete in {:.0f}m {:.0f}s'.format(
+                time_elapsed // 60, time_elapsed % 60))
 
             # decay learning rate if no val loss improvement in this epoch
 
@@ -221,7 +225,7 @@ def train_cnn(PATH_TO_IMAGES, LR, WEIGHT_DECAY):
     data_transforms = {
         'train': transforms.Compose([
             transforms.RandomHorizontalFlip(),
-            transforms.Scale(224),
+            transforms.Resize(224), # changed for pytorch 4.0.1
             # because scale doesn't always give 224 x 224, this ensures 224 x
             # 224
             transforms.CenterCrop(224),
@@ -229,7 +233,7 @@ def train_cnn(PATH_TO_IMAGES, LR, WEIGHT_DECAY):
             transforms.Normalize(mean, std)
         ]),
         'val': transforms.Compose([
-            transforms.Scale(224),
+            transforms.Resize(224),
             transforms.CenterCrop(224),
             transforms.ToTensor(),
             transforms.Normalize(mean, std)

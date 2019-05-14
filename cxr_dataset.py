@@ -29,16 +29,16 @@ class CXRDataset(Dataset):
         # if fold == "train" or fold =="val": sample=500
         if(sample > 0 and sample < len(self.df)):
             self.df = self.df.sample(sample)
-
+            
         if not finding == "any":  # can filter for positive findings of the kind described; useful for evaluation
             if finding in self.df.columns:
                 if len(self.df[self.df[finding] == 1]) > 0:
+                    print("Found " + str(len(self.df[self.df[finding] == 1])) + " cases for " + finding)
                     self.df = self.df[self.df[finding] == 1]
                 else:
-                    print("No positive cases exist for "+LABEL+", returning all unfiltered cases")
+                    print("No positive cases exist for " + finding + ", returning all unfiltered cases")
             else:
-                print("cannot filter on finding " + finding +
-                      " as not in data - please check spelling")
+                print("cannot filter on finding " + finding + " as not in data - please check spelling")
 
         self.df = self.df.set_index("Image Index")
         self.PRED_LABEL = [

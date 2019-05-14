@@ -169,6 +169,9 @@ def load_data(
 
     checkpoint = torch.load(PATH_TO_MODEL, map_location=lambda storage, loc: storage)
     model = checkpoint['model']
+    for i, (name, module) in enumerate(model._modules.items()):
+        module = recursion_change_bn(model)
+    
     del checkpoint
     model.cpu()
 
@@ -299,3 +302,11 @@ def show_next(dataloader, model, LABEL):
     preds.sort_values(by='Predicted Probability',inplace=True,ascending=False)
     
     return preds
+
+def recursion_change_bn(module):
+    if isinstance(module, torch.nn.BatchNorm2d):
+        module.track_running_stats = 1
+    else:
+        for i, (name, module1) in enumerate(module._modules.items()):
+            module1 = recursion_change_bn(module1)
+    return module
