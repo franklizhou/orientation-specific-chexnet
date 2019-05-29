@@ -328,18 +328,10 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
     std = [0.229, 0.224, 0.225]
 
     N_LABELS = 5  # we are predicting 14 labels
-
+    
+    
     # define torchvision transforms
     data_transforms = {
-        'train': transforms.Compose([
-            transforms.RandomHorizontalFlip(),
-            transforms.Resize(224), # changed for pytorch 4.0.1
-            # because scale doesn't always give 224 x 224, this ensures 224 x
-            # 224
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean, std)
-        ]),
         'val': transforms.Compose([
             transforms.Resize(224),
             transforms.CenterCrop(224),
@@ -347,6 +339,29 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
             transforms.Normalize(mean, std)
         ]),
     }
+    
+    if orientation == 'all':
+        data_transforms['train'] = transforms.Compose([
+            transforms.RandomHorizontalFlip(),
+            transforms.Resize(224), # changed for pytorch 4.0.1
+            # because scale doesn't always give 224 x 224, this ensures 224 x
+            # 224
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std)
+        ])
+    else:
+        data_transforms['train'] = transforms.Compose([
+            #transforms.RandomHorizontalFlip(),
+            transforms.Resize(224), # changed for pytorch 4.0.1
+            # because scale doesn't always give 224 x 224, this ensures 224 x
+            # 224
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean, std)
+        ])
+    
+    print(data_transforms)
 
     # create train/val dataloaders
     transformed_datasets = {}

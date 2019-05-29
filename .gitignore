@@ -1,3 +1,6 @@
 .ipynb_checkpoints/*
 __pycache__/*
 results*/*
+CheXpert-v1.0/*
+valid.tar.gz
+valid_image_paths.csv

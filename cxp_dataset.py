@@ -34,6 +34,7 @@ class CXPDataset(Dataset):
         self.transform = transform
         self.path_to_images = path_to_images
         self.path_to_csv = path_to_csv
+        self.fold = fold
         
         if fold == "train":
             #print('cxp_dataset: ' + path_to_csv + 'train.csv')
@@ -43,6 +44,8 @@ class CXPDataset(Dataset):
             self.df = pd.read_csv(path_to_csv + 'valid.csv')
         elif fold == "traintest":
             self.df = pd.read_csv(path_to_csv + 'traintest.csv')
+        elif fold == None:
+            self.df = pd.read_csv(path_to_csv)
         
         # blanks in dataframe assumed to be negative class    
         self.df.fillna(0, inplace=True)
@@ -116,15 +119,16 @@ class CXPDataset(Dataset):
             #'Support Devices'
         ]
         
-        self.df.drop(['No Finding', 
-                      'Enlarged Cardiomediastinum',
-                      'Lung Opacity',
-                      'Lung Lesion',
-                      'Pneumonia',
-                      'Pneumothorax',
-                      'Pleural Other',
-                      'Fracture', 
-                      'Support Devices'], axis=1, inplace=True)
+        if fold != None:
+            self.df.drop(['No Finding', 
+                          'Enlarged Cardiomediastinum',
+                          'Lung Opacity',
+                          'Lung Lesion',
+                          'Pneumonia',
+                          'Pneumothorax',
+                          'Pleural Other',
+                          'Fracture', 
+                          'Support Devices'], axis=1, inplace=True)
             
         #print(self.df)
         RESULT_PATH = "results/"
@@ -139,6 +143,12 @@ class CXPDataset(Dataset):
                 self.path_to_images,
                 self.df.index[idx]))
         image = image.convert('RGB')
+        
+        if self.transform:
+            image = self.transform(image)
+        
+        if self.fold == None:
+            return image
 
         label = np.zeros(len(self.PRED_LABEL), dtype=int)
         
@@ -147,8 +157,5 @@ class CXPDataset(Dataset):
             if(self.df[self.PRED_LABEL[i].strip()].iloc[idx].astype('int') > 0):
                 label[i] = self.df[self.PRED_LABEL[i].strip()
                                    ].iloc[idx].astype('int')
-
-        if self.transform:
-            image = self.transform(image)
 
         return (image, label,self.df.index[idx])
