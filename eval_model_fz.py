@@ -31,8 +31,7 @@ def make_pred_multilabel(data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, me
     # set model to eval mode; required for proper predictions given use of batchnorm
     model.train(False)
 
-    # NOTE!!!!!!!!!!!!!!!!
-    # create dataloader on VAL set
+    # create dataloader on val set if not provided
     if dataset == None:
         dataset = CXP.CXPDataset(
             path_to_images=PATH_TO_IMAGES,
@@ -52,6 +51,10 @@ def make_pred_multilabel(data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, me
     for i, data in enumerate(dataloader):
 
         inputs, labels, _ = data
+        
+        #print(labels)
+        #x = 5/0
+        
         inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
 
         true_labels = labels.cpu().data.numpy()

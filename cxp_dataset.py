@@ -16,13 +16,19 @@ class CXPDataset(Dataset):
             transform=None,
             sample=0,
             finding="any",
-            starter_images=False,
+            orientation="all",
             verbose = False):
        
         if uncertain not in [None, 'zeros', 'ones', 'self', 'multiclass']:
             print('Invalid uncertain strategy:', uncertain)
             with open("results/logger", 'a') as logfile:
                 logfile.write('Invalid uncertain strategy: ' + uncertain + '\n')
+            return
+        
+        if orientation not in ["all", "ap", "pa", "lat"]:
+            print('Invalid orientation strategy:', orientation)
+            with open("results/logger", 'a') as logfile:
+                logfile.write('Invalid orientation strategy: ' + orientation + '\n')
             return
         
         self.transform = transform
@@ -67,10 +73,15 @@ class CXPDataset(Dataset):
                 with open("results/logger", 'a') as logfile:
                     logfile.write("Uncertain labels are own class\n")
             self.df.replace(to_replace=-1, value=2, inplace=True)
-        
-        if(starter_images):
-            starter_images = pd.read_csv("starter_images.csv")
-            self.df=pd.merge(left=self.df,right=starter_images, how="inner",on="Image Index")
+            
+        if orientation == 'lat':
+            self.df = self.df[self.df['AP/PA'] == 0]
+        elif orientation == 'ap':
+            self.df = self.df[self.df['AP/PA'] == 'AP']
+        elif orientation == 'pa':
+            self.df = self.df[self.df['AP/PA'] == 'PA']
+            
+        #print(self.df)
             
         # can limit to sample, useful for testing
         # if fold == "train" or fold =="val": sample=500
@@ -89,20 +100,33 @@ class CXPDataset(Dataset):
 
         self.df = self.df.set_index("Path")
         self.PRED_LABEL = [
-            'No Finding',
-            'Enlarged Cardiomediastinum',
+            #'No Finding',
+            #'Enlarged Cardiomediastinum',
             'Cardiomegaly',
-            'Lung Opacity',
-            'Lung Lesion',
+            #'Lung Opacity',
+            #'Lung Lesion',
             'Edema',
             'Consolidation',
-            'Pneumonia',
+            #'Pneumonia',
             'Atelectasis',
-            'Pneumothorax',
-            'Pleural Effusion',
-            'Pleural Other',
-            'Fracture',
-            'Support Devices']
+            #'Pneumothorax',
+            'Pleural Effusion'
+            #'Pleural Other',
+            #'Fracture',
+            #'Support Devices'
+        ]
+        
+        self.df.drop(['No Finding', 
+                      'Enlarged Cardiomediastinum',
+                      'Lung Opacity',
+                      'Lung Lesion',
+                      'Pneumonia',
+                      'Pneumothorax',
+                      'Pleural Other',
+                      'Fracture', 
+                      'Support Devices'], axis=1, inplace=True)
+            
+        #print(self.df)
         RESULT_PATH = "results/"
 
     def __len__(self):

@@ -140,13 +140,10 @@ def train_model(
                 batch_size = inputs.shape[0]
                 inputs = Variable(inputs.cuda())
                 labels = Variable(labels.cuda()).float()
-                #labels = Variable(labels.cuda()).long()
                 outputs = model(inputs)
 
                 # calculate gradient and update parameters in train phase
                 optimizer.zero_grad()
-                #print(outputs)
-                #print(labels)
                 loss = criterion(outputs, labels)
                 if phase == 'train':
                     loss.backward()
@@ -194,32 +191,9 @@ def train_model(
                 print('mean epoch validation accuracy:', last_val_acc)
                 with open("results/logger", 'a') as logfile:
                     logfile.write('mean epoch validation accuracy: ' + str(last_val_acc) + '\n')
-
-#             # decay learning rate if no train loss improvement in this epoch
-#             if phase == 'train' and epoch_loss > best_loss:
-#                 print("Running with LR decay on TRAIN")
-#                 logger.append("Running with LR decay on TRAIN")
-#                 print("decay loss from " + str(LR) + " to " +
-#                       str(LR / 10) + " as not seeing improvement in train loss")
-#                 LR = LR / 10
-#                 # create new optimizer with lower learning rate
-#                 optimizer = optim.SGD(
-#                     filter(
-#                         lambda p: p.requires_grad,
-#                         model.parameters()),
-#                     lr=LR,
-#                     momentum=0.9,
-#                     weight_decay=weight_decay)
-#                 print("created new optimizer with LR " + str(LR))
-
-#             # checkpoint model if has best train loss yet
-#             if phase == 'train' and epoch_loss < best_loss:
-#                 best_loss = epoch_loss
-#                 best_epoch = epoch
-#                 checkpoint(model, best_loss, epoch, LR)
                 
             # decay learning rate if no val accuracy improvement in this epoch
-            if phase == 'val' and last_val_acc < best_val_acc and epoch >= best_epoch + 2:
+            if phase == 'val' and last_val_acc < best_val_acc: #and epoch >= best_epoch + 1:
                 print("Running with LR decay on val accuracy")
                 with open("results/logger", 'a') as logfile:
                     logfile.write("Running with LR decay on val accuracy\n")
@@ -291,9 +265,9 @@ def train_model(
             with open("results/logger", 'a') as logfile:
                 logfile.write("completed " + str(total_done) + " so far in epoch\n")
 
-        # break if no val loss improvement in 4 epochs
-        if ((epoch - best_epoch) >= 4):
-            print("no improvement in 4 epochs, break")
+        # break if no val loss improvement in 3 epochs
+        if ((epoch - best_epoch) >= 3):
+            print("no improvement in 3 epochs, break")
             with open("results/logger", 'a') as logfile:
                 logfile.write("no improvement in 4 epochs, break\n")
             break
@@ -312,7 +286,7 @@ def train_model(
     return model, best_epoch
 
 
-def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, NUM_IMAGES=223414, PATH_TO_CHECKPOINT=None):
+def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', NUM_IMAGES=223414, PATH_TO_CHECKPOINT=None):
     """
     Train torchvision model to NIH data given high level hyperparameters.
 
@@ -343,18 +317,17 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, NUM_IMAGES=223414, 
     
     
     print("Running with WD, LR:", WEIGHT_DECAY, LR)
+    print("Using orientation:", orientation)
     
     with open("results/logger", 'a') as logfile:
-        logfile.write("Running with WD, LR:" + str(WEIGHT_DECAY) + ' ' + str(LR) + '\n')
-
-    
-    out = []
+        logfile.write("Running with WD, LR: " + str(WEIGHT_DECAY) + ' ' + str(LR) + '\n')
+        logfile.write("Using orientation: " + orientation + '\n')
 
     # use imagenet mean,std for normalization
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
 
-    N_LABELS = 14  # we are predicting 14 labels
+    N_LABELS = 5  # we are predicting 14 labels
 
     # define torchvision transforms
     data_transforms = {
@@ -383,6 +356,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, NUM_IMAGES=223414, 
         fold='train',
         uncertain = 'ones',
         transform=data_transforms['train'],
+        orientation=orientation,
         sample = NUM_IMAGES,
         verbose = True
     )
@@ -391,6 +365,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, NUM_IMAGES=223414, 
         path_to_csv=PATH_TO_CSV,
         fold='val',
         transform=data_transforms['val'],
+        orientation=orientation,
         verbose = True
     )
     
