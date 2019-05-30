@@ -15,6 +15,8 @@ class CXPDataset(Dataset):
             uncertain=None,
             transform=None,
             sample=0,
+            head=0,
+            tail=0,
             finding="any",
             orientation="all",
             verbose = False):
@@ -37,10 +39,8 @@ class CXPDataset(Dataset):
         self.fold = fold
         
         if fold == "train":
-            #print('cxp_dataset: ' + path_to_csv + 'train.csv')
             self.df = pd.read_csv(path_to_csv + 'train.csv')
         elif fold == "val":
-            #print('cxp_dataset: ' + path_to_csv + 'valid.csv')
             self.df = pd.read_csv(path_to_csv + 'valid.csv')
         elif fold == "traintest":
             self.df = pd.read_csv(path_to_csv + 'traintest.csv')
@@ -88,8 +88,22 @@ class CXPDataset(Dataset):
             
         # can limit to sample, useful for testing
         # if fold == "train" or fold =="val": sample=500
-        if(sample > 0 and sample < len(self.df)):
-            self.df = self.df.sample(sample)
+         
+        
+        if (sample > 0 and sample < len(self.df)):
+            self.df = self.df.head(sample)
+            
+        if head > 0:
+            num_head = int(len(self.df)*head)
+            self.df = self.df.head(num_head)
+        
+        if tail > 0:
+            num_head = int(len(self.df)*(1-tail))
+            num_tail = len(self.df) - num_head
+            self.df = self.df.tail(num_tail)
+        
+        #print(self.df)
+        
 
         if not finding == "any":  # can filter for positive findings of the kind described; useful for evaluation
             if finding in self.df.columns:

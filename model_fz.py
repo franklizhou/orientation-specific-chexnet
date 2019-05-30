@@ -75,14 +75,14 @@ def train_model(
         data_transforms,
         PATH_TO_IMAGES,
         PATH_TO_CSV,
-        val_on_train=False):
+        val_on_dataset=False):
     """
-    Fine tunes torchvision model to NIH CXR data.
+    Fine tunes torchvision model to CheXpert data.
 
     Args:
         model: torchvision model to be finetuned (densenet-121 in this case)
         criterion: loss criterion (binary cross entropy loss, BCELoss)
-        optimizer: optimizer to use in training (SGD)
+        optimizer: optimizer to use in training (Adam)
         LR: learning rate
         num_epochs: continue training up to this many epochs
         dataloaders: pytorch train and val dataloaders
@@ -103,10 +103,10 @@ def train_model(
     last_train_loss = -1
     last_val_acc = 0
     
-    if val_on_train:
-        print("WARNING: VALIDATING ON TRAIN SET")
+    if val_on_dataset:
+        print("WARNING: VALIDATING ON DATASET")
         with open("results/logger", 'a') as logfile:
-            logfile.write("WARNING: VALIDATING ON TRAIN SET\n")
+            logfile.write("WARNING: VALIDATING ON DATASET\n")
             
     print(time.strftime("%d %b %Y %H:%M:%S", time.gmtime(time.time()-25200)))
     with open("results/logger", 'a') as logfile:
@@ -174,7 +174,7 @@ def train_model(
                 last_train_loss = epoch_loss
                 
             if phase == 'val':
-                if val_on_train:
+                if val_on_dataset:
                     _, metric = E.make_pred_multilabel(data_transforms, model, 
                                                        PATH_TO_IMAGES, PATH_TO_CSV, 'auc', dataset=dataset)
                 else:
@@ -203,14 +203,6 @@ def train_model(
                     logfile.write("decay loss from " + str(LR) + " to " +
                       str(LR / 10) + " as not seeing improvement in val accuracy\n")
                 LR = LR / 10
-                # create new optimizer with lower learning rate
-#                 optimizer = optim.SGD(
-#                     filter(
-#                         lambda p: p.requires_grad,
-#                         model.parameters()),
-#                     lr=LR,
-#                     momentum=0.9,
-#                     weight_decay=weight_decay)
                 optimizer = optim.Adam(
                     filter(
                         lambda p: p.requires_grad,
@@ -286,7 +278,8 @@ def train_model(
     return model, best_epoch
 
 
-def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', NUM_IMAGES=223414, PATH_TO_CHECKPOINT=None):
+def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', cross_val_on_train=False, 
+              NUM_IMAGES=223414, PATH_TO_CHECKPOINT=None):
     """
     Train torchvision model to NIH data given high level hyperparameters.
 
@@ -350,6 +343,9 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
             transforms.ToTensor(),
             transforms.Normalize(mean, std)
         ])
+        print("Using random horizontal flip")
+        with open("results/logger", 'a') as logfile:
+            logfile.write("Using random horizontal flip")
     else:
         data_transforms['train'] = transforms.Compose([
             #transforms.RandomHorizontalFlip(),
@@ -360,29 +356,76 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
             transforms.ToTensor(),
             transforms.Normalize(mean, std)
         ])
+        print("Not using random horizontal flip")
+        with open("results/logger", 'a') as logfile:
+            logfile.write("Not using random horizontal flip")
     
     print(data_transforms)
 
     # create train/val dataloaders
     transformed_datasets = {}
-    transformed_datasets['train'] = CXP.CXPDataset(
-        path_to_images=PATH_TO_IMAGES,
-        path_to_csv=PATH_TO_CSV,
-        fold='train',
-        uncertain = 'ones',
-        transform=data_transforms['train'],
-        orientation=orientation,
-        sample = NUM_IMAGES,
-        verbose = True
-    )
-    transformed_datasets['val'] = CXP.CXPDataset(
-        path_to_images=PATH_TO_IMAGES,
-        path_to_csv=PATH_TO_CSV,
-        fold='val',
-        transform=data_transforms['val'],
-        orientation=orientation,
-        verbose = True
-    )
+    
+    if cross_val_on_train == False: 
+        print("Not cross validating on train set")
+        with open("results/logger", 'a') as logfile:
+            logfile.write("Not cross validating on train set")
+        print("On train: ", end=" ")
+        with open("results/logger", 'a') as logfile:
+            logfile.write("On train: ")
+        transformed_datasets['train'] = CXP.CXPDataset(
+            path_to_images=PATH_TO_IMAGES,
+            path_to_csv=PATH_TO_CSV,
+            fold='train',
+            uncertain = 'ones',
+            transform=data_transforms['train'],
+            orientation=orientation,
+            sample = NUM_IMAGES,
+            verbose = True
+        )
+        print("On val: ", end=" ")
+        with open("results/logger", 'a') as logfile:
+            logfile.write("On val: ")
+        transformed_datasets['val'] = CXP.CXPDataset(
+            path_to_images=PATH_TO_IMAGES,
+            path_to_csv=PATH_TO_CSV,
+            fold='val',
+            transform=data_transforms['val'],
+            orientation=orientation,
+            verbose = True
+        )
+    else:
+        print("Cross validating on train set")
+        with open("results/logger", 'a') as logfile:
+            logfile.write("Cross validating on train set")
+        print("On train: ", end=" ")
+        with open("results/logger", 'a') as logfile:
+            logfile.write("On train: ")
+        HEAD = 0.8
+        transformed_datasets['train'] = CXP.CXPDataset(
+            path_to_images=PATH_TO_IMAGES,
+            path_to_csv=PATH_TO_CSV,
+            fold='train',
+            uncertain = 'ones',
+            transform=data_transforms['train'],
+            orientation=orientation,
+            sample = NUM_IMAGES,
+            head = HEAD,
+            verbose = True
+        )
+        print("On val: ", end=" ")
+        with open("results/logger", 'a') as logfile:
+            logfile.write("On val: ")
+        transformed_datasets['val'] = CXP.CXPDataset(
+            path_to_images=PATH_TO_IMAGES,
+            path_to_csv=PATH_TO_CSV,
+            fold='train',
+            uncertain = 'ones',
+            transform=data_transforms['val'],
+            orientation=orientation,
+            sample = NUM_IMAGES,
+            tail = 1 - HEAD,
+            verbose = True
+        )
     
     print("Size of train set:", len(transformed_datasets['train']))
     print("Size of val set:", len(transformed_datasets['val']))
@@ -418,15 +461,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
         model = checkpoint['model']
 
     # define criterion, optimizer for training
-    #criterion = nn.CrossEntropyLoss()
     criterion = nn.BCELoss()
-#     optimizer = optim.SGD(
-#         filter(
-#             lambda p: p.requires_grad,
-#             model.parameters()),
-#         lr=LR,
-#         momentum=0.9,
-#         weight_decay=WEIGHT_DECAY)
     
     optimizer = optim.Adam(
         filter(
@@ -444,8 +479,8 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
     # train model
     model, best_epoch = train_model(model, criterion, optimizer, LR, num_epochs=NUM_EPOCHS,
                                     dataloaders=dataloaders, dataset_sizes=dataset_sizes, weight_decay=WEIGHT_DECAY, 
-                                    dataset=transformed_datasets['train'], data_transforms=data_transforms, 
-                                    PATH_TO_IMAGES=PATH_TO_IMAGES, PATH_TO_CSV=PATH_TO_CSV, val_on_train=False)
+                                    dataset=transformed_datasets['val'], data_transforms=data_transforms, 
+                                    PATH_TO_IMAGES=PATH_TO_IMAGES, PATH_TO_CSV=PATH_TO_CSV, val_on_dataset=cross_val_on_train)
     
     print("Model training complete")
 
