@@ -4,6 +4,7 @@ from torch.utils.data import Dataset
 import os
 from PIL import Image
 
+ORIENTATION = ['AP', 'PA', '0']
 
 class CXPDataset(Dataset):
 
@@ -27,7 +28,7 @@ class CXPDataset(Dataset):
                 logfile.write('Invalid uncertain strategy: ' + uncertain + '\n')
             return
         
-        if orientation not in ["all", "ap", "pa", "lat"]:
+        if orientation not in ["all", "ap", "pa", "lat", 'trainer']:
             print('Invalid orientation strategy:', orientation)
             with open("results/logger", 'a') as logfile:
                 logfile.write('Invalid orientation strategy: ' + orientation + '\n')
@@ -37,6 +38,7 @@ class CXPDataset(Dataset):
         self.path_to_images = path_to_images
         self.path_to_csv = path_to_csv
         self.fold = fold
+        self.orientation = orientation
         
         if fold == "train":
             self.df = pd.read_csv(path_to_csv + 'train.csv')
@@ -116,22 +118,17 @@ class CXPDataset(Dataset):
                 print("cannot filter on finding " + finding + " as not in data - please check spelling")
 
         self.df = self.df.set_index("Path")
-        self.PRED_LABEL = [
-            #'No Finding',
-            #'Enlarged Cardiomediastinum',
-            'Cardiomegaly',
-            #'Lung Opacity',
-            #'Lung Lesion',
-            'Edema',
-            'Consolidation',
-            #'Pneumonia',
-            'Atelectasis',
-            #'Pneumothorax',
-            'Pleural Effusion'
-            #'Pleural Other',
-            #'Fracture',
-            #'Support Devices'
-        ]
+        
+        if orientation != 'trainer':
+            self.PRED_LABEL = [
+                'Cardiomegaly',
+                'Edema',
+                'Consolidation',
+                'Atelectasis',
+                'Pleural Effusion'
+            ]
+        else:
+            self.PRED_LABEL = ['AP/PA']
         
         if fold != None:
             self.df.drop(['No Finding', 
@@ -164,12 +161,30 @@ class CXPDataset(Dataset):
         if self.fold == None:
             return image
 
-        label = np.zeros(len(self.PRED_LABEL), dtype=int)
+        if self.orientation != 'trainer':
+            label = np.zeros(len(self.PRED_LABEL), dtype=int)
+        else:
+            label = np.zeros(3, dtype=int)
         
-        for i in range(0, len(self.PRED_LABEL)):
-             # can leave zero if zero, else make one
-            if(self.df[self.PRED_LABEL[i].strip()].iloc[idx].astype('int') > 0):
-                label[i] = self.df[self.PRED_LABEL[i].strip()
-                                   ].iloc[idx].astype('int')
+        
+        if self.orientation != 'trainer':
+            for i in range(0, len(self.PRED_LABEL)):
+                # can leave zero if zero, else make one
+                if(self.df[self.PRED_LABEL[i].strip()].iloc[idx].astype('int') > 0):
+                    label[i] = self.df[self.PRED_LABEL[i].strip()].iloc[idx].astype('int')
+        else:
+            ORIENTATION_DICT = {
+                'AP': 0,
+                'LL': 0,
+                'PA': 1,
+                '0': 2}
+            #print(self.df[self.PRED_LABEL[0]].iloc[idx])
+            try:
+                label = ORIENTATION_DICT[str(self.df[self.PRED_LABEL[0].strip()].iloc[idx])]
+            except:
+                print("LABEL FAILURE")
+                label = 0
+            #print(label)
+                
 
         return (image, label,self.df.index[idx])

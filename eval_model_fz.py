@@ -6,11 +6,13 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 import sklearn
 import sklearn.metrics as sklm
+from sklearn.preprocessing import label_binarize
 from torch.autograd import Variable
 import numpy as np
 
+ORIENTATION = ['AP', 'PA', '0']
 
-def make_pred_multilabel(data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, metric, dataset=None, verbose=False):
+def make_pred_multilabel(data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, metric, multiclass=False, dataset=None, verbose=False):
     """
     Gives predictions for test fold and calculates AUCs using previously trained model
 
@@ -42,6 +44,9 @@ def make_pred_multilabel(data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, me
     dataloader = torch.utils.data.DataLoader(
         dataset, BATCH_SIZE, shuffle=False, num_workers=8)
     size = len(dataset)
+    
+    print('Evaluating on', size, 'samples')
+    print("Model train: ", model.training)
 
     # create empty dfs
     pred_df = pd.DataFrame(columns=["Image Index"])
@@ -52,29 +57,45 @@ def make_pred_multilabel(data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, me
 
         inputs, labels, _ = data
         
-        #print(labels)
-        #x = 5/0
-        
         inputs, labels = Variable(inputs.cuda()), Variable(labels.cuda())
 
         true_labels = labels.cpu().data.numpy()
+        
+        if multiclass:
+            binary_labels = label_binarize(true_labels, classes=[0, 1, 2])
+        
         batch_size = true_labels.shape
 
         outputs = model(inputs)
         probs = outputs.cpu().data.numpy()
+        
+        print(probs)
+        print(binary_labels)
 
         # get predictions and true values for each item in batch
         for j in range(0, batch_size[0]):
             thisrow = {}
             truerow = {}
+            #print(dataset.df.index[BATCH_SIZE * i + j])
             thisrow["Image Index"] = dataset.df.index[BATCH_SIZE * i + j]
             truerow["Image Index"] = dataset.df.index[BATCH_SIZE * i + j]
 
             # iterate over each entry in prediction vector; each corresponds to
             # individual label
-            for k in range(len(dataset.PRED_LABEL)):
-                thisrow["prob_" + dataset.PRED_LABEL[k]] = probs[j, k]
-                truerow[dataset.PRED_LABEL[k]] = true_labels[j, k]
+            if not multiclass:
+                for k in range(len(dataset.PRED_LABEL)):
+                    thisrow["prob_" + dataset.PRED_LABEL[k]] = probs[j, k]
+                    truerow[dataset.PRED_LABEL[k]] = true_labels[j, k]
+                
+            # iterate over each entry in prediction vector; each corresponds to
+            # individual label
+            else:       
+                for k in range(probs.shape[1]):
+                    thisrow["prob_" + ORIENTATION[k]] = probs[j, k]
+                    truerow[ORIENTATION[k]] = binary_labels[j, k]
+                    
+            #print('thisrow:', thisrow)
+            #print('truerow:', truerow)
 
             pred_df = pred_df.append(thisrow, ignore_index=True)
             true_df = true_df.append(truerow, ignore_index=True)
@@ -94,7 +115,7 @@ def make_pred_multilabel(data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, me
     # calc accuracies
     for column in true_df:
 
-        if column not in [
+        if not multiclass and column not in [
             'No Finding',
             'Enlarged Cardiomediastinum',
             'Cardiomegaly',
@@ -110,6 +131,8 @@ def make_pred_multilabel(data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, me
             'Fracture',
             'Support Devices']:
                     continue
+        if multiclass and column not in ['AP', 'PA', '0']:
+            continue
         actual = true_df[column]
         pred = pred_df["prob_" + column]
         thisrow = {}

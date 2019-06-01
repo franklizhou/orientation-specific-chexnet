@@ -121,123 +121,132 @@ def train_model(
             logfile.write('Epoch {}/{}\n'.format(epoch, num_epochs))
             logfile.write('-' * 10 + '\n')
 
-        # set model to train or eval mode based on whether we are in train or
-        # val; necessary to get correct predictions given batchnorm
-        for phase in ['train', 'val']:
-            if phase == 'train':
-                model.train(True)
-            else:
-                model.train(False)
+        running_loss = 0.0
+        running_misclass = 0
 
-            running_loss = 0.0
+        i = 0
+        total_done = 0
+        
+        model.train(True)
+        print("Model train: ", model.training)
 
-            i = 0
-            total_done = 0
-            # iterate over all data in train/val dataloader:
-            for data in dataloaders[phase]:
-                i += 1
-                inputs, labels, _ = data
-                batch_size = inputs.shape[0]
-                inputs = Variable(inputs.cuda())
+        # iterate over all data in train/val dataloader:
+        for data in dataloaders['train']:
+            i += 1
+            inputs, labels, _ = data
+            #print(labels)
+            batch_size = inputs.shape[0]
+            inputs = Variable(inputs.cuda())
+            if str(criterion) == str(nn.BCELoss()):
                 labels = Variable(labels.cuda()).float()
-                outputs = model(inputs)
+            else:
+                labels = Variable(labels.cuda()).long()
+            outputs = model(inputs)
 
-                # calculate gradient and update parameters in train phase
-                optimizer.zero_grad()
-                loss = criterion(outputs, labels)
-                if phase == 'train':
-                    loss.backward()
-                    optimizer.step()
-
-                running_loss += loss.data.item() * batch_size
-
-            epoch_loss = running_loss / dataset_sizes[phase]
+            # calculate gradient and update parameters in train phase
+            optimizer.zero_grad()
+            loss = criterion(outputs, labels)
             
-            print(time.strftime("%d %b %Y %H:%M:%S", time.gmtime(time.time()-25200)))
-            with open("results/logger", 'a') as logfile:
-                logfile.write(time.strftime("%d %b %Y %H:%M:%S\n", time.gmtime(time.time()-25200)))
+            loss.backward()
+            optimizer.step()
 
-            print(phase + ' epoch {}: loss {:.4f} with data size {}'.format(
-                epoch, epoch_loss, dataset_sizes[phase]))
-            with open("results/logger", 'a') as logfile:
-                logfile.write(phase + ' epoch {}: loss {:.4f} with data size {}\n'.format(
-                epoch, epoch_loss, dataset_sizes[phase]))
+            running_loss += loss.data.item() * batch_size
+
+            #if phase == 'val' and str(criterion) == str(nn.CrossEntropyLoss()):
+            #    print(labels)
+            #    idx = torch.argmax(outputs, dim=1)
+            #    print(idx)
+
+        epoch_loss = running_loss / dataset_sizes['train']
+
+        print(time.strftime("%d %b %Y %H:%M:%S", time.gmtime(time.time()-25200)))
+        with open("results/logger", 'a') as logfile:
+            logfile.write(time.strftime("%d %b %Y %H:%M:%S\n", time.gmtime(time.time()-25200)))
+
+        print('train epoch {}: loss {:.4f} with data size {}'.format(
+            epoch, epoch_loss, dataset_sizes['train']))
+        with open("results/logger", 'a') as logfile:
+            logfile.write('train epoch {}: loss {:.4f} with data size {}\n'.format(
+            epoch, epoch_loss, dataset_sizes['train']))
+
+        time_elapsed = time.time() - since
+        print('train epoch complete in {:.0f}m {:.0f}s'.format(
+            time_elapsed // 60, time_elapsed % 60))
+        with open("results/logger", 'a') as logfile:
+            logfile.write('train epoch complete in {:.0f}m {:.0f}s\n'.format(
+            time_elapsed // 60, time_elapsed % 60))
+
+        last_train_loss = epoch_loss
+        
+        # keep track of best train loss
+        if epoch_loss < best_loss:
+            best_loss = epoch_loss
             
-            time_elapsed = time.time() - since
-            print(phase + ' epoch complete in {:.0f}m {:.0f}s'.format(
-                time_elapsed // 60, time_elapsed % 60))
+        # done with training
+
+        if str(criterion) == 'BCELoss()':
+            if val_on_dataset:
+                _, metric = E.make_pred_multilabel(data_transforms, model, 
+                                                   PATH_TO_IMAGES, PATH_TO_CSV, 'auc', dataset=dataset)
+            else:
+                _, metric = E.make_pred_multilabel(data_transforms, model, 
+                                                   PATH_TO_IMAGES, PATH_TO_CSV, 'auc')
+        else:
+            _, metric = E.make_pred_multilabel(data_transforms, model, 
+                                                   PATH_TO_IMAGES, PATH_TO_CSV, 'auc', dataset=dataset, multiclass=True)
+
+        auc = metric.as_matrix(columns=metric.columns[1:])
+        last_val_acc = auc[~np.isnan(auc)].mean() 
+
+        print(metric)
+        with open("results/logger", 'a') as logfile:
+            print(metric, file=logfile)
+
+        print('mean epoch validation accuracy:', last_val_acc)
+        with open("results/logger", 'a') as logfile:
+            logfile.write('mean epoch validation accuracy: ' + str(last_val_acc) + '\n')
+                
+        # decay learning rate if no val accuracy improvement in this epoch
+        if last_val_acc < best_val_acc: 
+            print("Running with LR decay on val accuracy")
             with open("results/logger", 'a') as logfile:
-                logfile.write(phase + ' epoch complete in {:.0f}m {:.0f}s\n'.format(
-                time_elapsed // 60, time_elapsed % 60))
-            
-            if phase == 'train':
-                last_train_loss = epoch_loss
-                
-            if phase == 'val':
-                if val_on_dataset:
-                    _, metric = E.make_pred_multilabel(data_transforms, model, 
-                                                       PATH_TO_IMAGES, PATH_TO_CSV, 'auc', dataset=dataset)
-                else:
-                    _, metric = E.make_pred_multilabel(data_transforms, model, 
-                                                       PATH_TO_IMAGES, PATH_TO_CSV, 'auc')
-                
-                auc = metric.as_matrix(columns=metric.columns[1:])
-                last_val_acc = auc[~np.isnan(auc)].mean() 
-                
-                print(metric)
-                with open("results/logger", 'a') as logfile:
-                    print(metric, file=logfile)
-                
-                print('mean epoch validation accuracy:', last_val_acc)
-                with open("results/logger", 'a') as logfile:
-                    logfile.write('mean epoch validation accuracy: ' + str(last_val_acc) + '\n')
-                
-            # decay learning rate if no val accuracy improvement in this epoch
-            if phase == 'val' and last_val_acc < best_val_acc: #and epoch >= best_epoch + 1:
-                print("Running with LR decay on val accuracy")
-                with open("results/logger", 'a') as logfile:
-                    logfile.write("Running with LR decay on val accuracy\n")
-                print("decay loss from " + str(LR) + " to " +
-                      str(LR / 10) + " as not seeing improvement in val accuracy")
-                with open("results/logger", 'a') as logfile:
-                    logfile.write("decay loss from " + str(LR) + " to " +
-                      str(LR / 10) + " as not seeing improvement in val accuracy\n")
-                LR = LR / 10
-                optimizer = optim.Adam(
-                    filter(
-                        lambda p: p.requires_grad,
-                        model.parameters()),
-                    lr=LR,
-                    betas=(0.9, 0.999),
-                    eps=1e-08,
-                    weight_decay=weight_decay)
-                
-                print("created new optimizer with LR " + str(LR))
-                with open("results/logger", 'a') as logfile:
-                        logfile.write("created new optimizer with LR " + str(LR) + '\n')
+                logfile.write("Running with LR decay on val accuracy\n")
+            print("decay loss from " + str(LR) + " to " +
+                  str(LR / 10) + " as not seeing improvement in val accuracy")
+            with open("results/logger", 'a') as logfile:
+                logfile.write("decay loss from " + str(LR) + " to " +
+                  str(LR / 10) + " as not seeing improvement in val accuracy\n")
+            LR = LR / 10
+            optimizer = optim.Adam(
+                filter(
+                    lambda p: p.requires_grad,
+                    model.parameters()),
+                lr=LR,
+                betas=(0.9, 0.999),
+                eps=1e-08,
+                weight_decay=weight_decay)
 
-            # keep track of best train loss
-            if phase == 'train' and epoch_loss < best_loss:
-                best_loss = epoch_loss
-                
-            # checkpoint model if has best val accuracy yet
-            if phase == 'val' and last_val_acc > best_val_acc:
-                best_val_acc = last_val_acc
-                best_epoch = epoch
-                
-            if phase == 'val':
-                print('saving checkpoint_' + str(epoch))
-                with open("results/logger", 'a') as logfile:
-                    logfile.write('saving checkpoint_' + str(epoch) + '\n')
-                checkpoint(model, last_train_loss, last_val_acc, metric, epoch, best_epoch, LR, weight_decay)
+            print("created new optimizer with LR " + str(LR))
+            with open("results/logger", 'a') as logfile:
+                    logfile.write("created new optimizer with LR " + str(LR) + '\n')
 
-            # log training and validation loss over each epoch
-            if phase == 'val':
-                with open("results/log_train", 'a') as logfile:
-                    logwriter = csv.writer(logfile, delimiter=',')
-                    if(epoch == 1):
-                        logwriter.writerow(["epoch", "train_loss", "val_loss", "average auc"])
-                    logwriter.writerow([epoch, last_train_loss, epoch_loss, last_val_acc])
+
+        # track best val accuracy yet
+        if last_val_acc > best_val_acc:
+            best_val_acc = last_val_acc
+            best_epoch = epoch
+
+        print('saving checkpoint_' + str(epoch))
+        with open("results/logger", 'a') as logfile:
+            logfile.write('saving checkpoint_' + str(epoch) + '\n')
+        checkpoint(model, last_train_loss, last_val_acc, metric, epoch, best_epoch, LR, weight_decay)
+
+        # log training loss over each epoch
+        with open("results/log_train", 'a') as logfile:
+            logwriter = csv.writer(logfile, delimiter=',')
+            if(epoch == 1):
+                logwriter.writerow(["epoch", "train_loss", "average auc"])
+            logwriter.writerow([epoch, last_train_loss, last_val_acc])
 
         print("best epoch: ", best_epoch)
         with open("results/logger", 'a') as logfile:
@@ -261,7 +270,7 @@ def train_model(
         if ((epoch - best_epoch) >= 3):
             print("no improvement in 3 epochs, break")
             with open("results/logger", 'a') as logfile:
-                logfile.write("no improvement in 4 epochs, break\n")
+                logfile.write("no improvement in 3 epochs, break\n")
             break
 
     time_elapsed = time.time() - since
@@ -294,6 +303,10 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
 
     """
     
+    if orientation not in ['all', 'ap', 'pa', 'lat', 'trainer']:
+        print('Not using a valid orientation')
+        return
+    
     try:
         if os.path.exists('results/'):
             print("Remove or rename results directory")
@@ -308,7 +321,6 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
     NUM_EPOCHS = 100
     BATCH_SIZE = 16
     
-    
     print("Running with WD, LR:", WEIGHT_DECAY, LR)
     print("Using orientation:", orientation)
     
@@ -320,7 +332,8 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
     mean = [0.485, 0.456, 0.406]
     std = [0.229, 0.224, 0.225]
 
-    N_LABELS = 5  # we are predicting 14 labels
+    N_LABELS = 5  # we are predicting 5 labels
+    N_ORIENTS = 3 # we are predicting 3 orientations
     
     
     # define torchvision transforms
@@ -345,7 +358,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
         ])
         print("Using random horizontal flip")
         with open("results/logger", 'a') as logfile:
-            logfile.write("Using random horizontal flip")
+            logfile.write("Using random horizontal flip\n")
     else:
         data_transforms['train'] = transforms.Compose([
             #transforms.RandomHorizontalFlip(),
@@ -358,7 +371,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
         ])
         print("Not using random horizontal flip")
         with open("results/logger", 'a') as logfile:
-            logfile.write("Not using random horizontal flip")
+            logfile.write("Not using random horizontal flip\n")
     
     print(data_transforms)
 
@@ -368,7 +381,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
     if cross_val_on_train == False: 
         print("Not cross validating on train set")
         with open("results/logger", 'a') as logfile:
-            logfile.write("Not cross validating on train set")
+            logfile.write("Not cross validating on train set\n")
         print("On train: ", end=" ")
         with open("results/logger", 'a') as logfile:
             logfile.write("On train: ")
@@ -396,7 +409,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
     else:
         print("Cross validating on train set")
         with open("results/logger", 'a') as logfile:
-            logfile.write("Cross validating on train set")
+            logfile.write("Cross validating on train set\n")
         print("On train: ", end=" ")
         with open("results/logger", 'a') as logfile:
             logfile.write("On train: ")
@@ -426,9 +439,12 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
             tail = 1 - HEAD,
             verbose = True
         )
+        
+    #print(transformed_datasets['train'].df[transformed_datasets['train'].df.columns[0]])
+    #print(transformed_datasets['val'].df[transformed_datasets['val'].df.columns[0]])
     
-    print("Size of train set:", len(transformed_datasets['train']))
-    print("Size of val set:", len(transformed_datasets['val']))
+    #print("Size of train set:", len(transformed_datasets['train']))
+    #print("Size of val set:", len(transformed_datasets['val']))
 
     dataloaders = {}
     dataloaders['train'] = torch.utils.data.DataLoader(
@@ -451,8 +467,12 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
         num_ftrs = model.classifier.in_features
         # add final layer with # outputs in same dimension of labels with sigmoid
         # activation
-        model.classifier = nn.Sequential(
-            nn.Linear(num_ftrs, N_LABELS), nn.Sigmoid())
+        if orientation != 'trainer':
+            model.classifier = nn.Sequential(
+                nn.Linear(num_ftrs, N_LABELS), nn.Sigmoid())
+        else:
+            model.classifier = nn.Sequential(
+                nn.Linear(num_ftrs, N_ORIENTS), nn.Softmax())
 
         # put model on GPU
         model = model.cuda()
@@ -461,7 +481,12 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
         model = checkpoint['model']
 
     # define criterion, optimizer for training
-    criterion = nn.BCELoss()
+    if orientation != 'trainer':
+        criterion = nn.BCELoss()
+    else:
+        criterion = nn.CrossEntropyLoss()
+        
+    print(criterion)
     
     optimizer = optim.Adam(
         filter(
@@ -485,7 +510,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
     print("Model training complete")
 
     # get preds and AUCs on test fold
-    preds, aucs = E.make_pred_multilabel(
-        data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, 'auc')
+    #preds, aucs = E.make_pred_multilabel(
+    #    data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, 'auc')
 
-    return preds, aucs
+    #return preds, aucs
