@@ -69,8 +69,8 @@ def make_pred_multilabel(data_transforms, model, PATH_TO_IMAGES, PATH_TO_CSV, me
         outputs = model(inputs)
         probs = outputs.cpu().data.numpy()
         
-        print(probs)
-        print(binary_labels)
+        #print(probs)
+        #print(binary_labels)
 
         # get predictions and true values for each item in batch
         for j in range(0, batch_size[0]):
