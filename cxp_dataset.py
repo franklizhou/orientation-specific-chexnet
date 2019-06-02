@@ -4,8 +4,6 @@ from torch.utils.data import Dataset
 import os
 from PIL import Image
 
-ORIENTATION = ['AP', 'PA', '0']
-
 class CXPDataset(Dataset):
 
     def __init__(
@@ -20,6 +18,12 @@ class CXPDataset(Dataset):
             finding="any",
             orientation="all",
             verbose = False):
+        
+        self.ORIENTATION_DICT = {
+                'AP': 0,
+                'LL': 0,
+                'PA': 1,
+                '0': 2}
        
         if uncertain not in [None, 'zeros', 'ones', 'self', 'multiclass']:
             print('Invalid uncertain strategy:', uncertain)
@@ -178,16 +182,10 @@ class CXPDataset(Dataset):
                 if(self.df[self.PRED_LABEL[i].strip()].iloc[idx].astype('int') > 0):
                     label[i] = self.df[self.PRED_LABEL[i].strip()].iloc[idx].astype('int')
         else:
-            ORIENTATION_DICT = {
-                'AP': 0,
-                'LL': 0,
-                'PA': 1,
-                '0': 2}
-            #print(self.df[self.PRED_LABEL[0]].iloc[idx])
             try:
-                label = ORIENTATION_DICT[str(self.df[self.PRED_LABEL[0].strip()].iloc[idx])]
+                label = self.ORIENTATION_DICT[str(self.df[self.PRED_LABEL[0].strip()].iloc[idx])]
             except:
-                print("LABEL FAILURE")
+                print("LABEL FAILURE:", label)
                 label = 0
             #print(label)
                 
