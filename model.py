@@ -27,7 +27,7 @@ import numpy as np
 import csv
 
 import cxp_dataset as CXP
-import eval_model_fz as E
+import eval_model as E
 
 use_gpu = torch.cuda.is_available()
 gpu_count = torch.cuda.device_count()
