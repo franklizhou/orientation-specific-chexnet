@@ -1,8 +1,5 @@
 import torch
 import cxp_dataset as CXP
-import eval_model_fz as E
-import model_fz as M
-
 
 class AssembledModel():
 
@@ -14,14 +11,6 @@ class AssembledModel():
             PATH_TO_ORIENT,
             PATH_TO_IMAGES,
             PATH_TO_CSV):
-
-        PATH_TO_LAT = "/home/frank_li_zhou/reproduce-chexnet/results_05302019_adam_lat_uones_noflip/checkpoint_3"
-        PATH_TO_PA = "/home/frank_li_zhou/reproduce-chexnet/results_05302019_adam_pa_uones_noflip/checkpoint_2"
-        PATH_TO_AP = "/home/frank_li_zhou/reproduce-chexnet/results_05292019_adam_ap_uones_noflip/checkpoint_2"
-        PATH_TO_ORIENT = "/home/frank_li_zhou/reproduce-chexnet/orientation_model_06012019_not_trained/checkpoint_6"
-
-        PATH_TO_IMAGES = "/home/frank_li_zhou/"
-        PATH_TO_CSV = "/home/frank_li_zhou/CheXpert-v1.0/"
 
         checkpoint_lat = torch.load(PATH_TO_LAT, map_location=lambda storage, loc: storage)
         checkpoint_pa = torch.load(PATH_TO_PA, map_location=lambda storage, loc: storage)

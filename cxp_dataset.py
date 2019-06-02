@@ -88,32 +88,22 @@ class CXPDataset(Dataset):
             self.df = self.df[self.df['AP/PA'] == 'AP']
         elif orientation == 'pa':
             self.df = self.df[self.df['AP/PA'] == 'PA']
-            
-        #print(self.df)
-            
-        # can limit to sample, useful for testing
-        # if fold == "train" or fold =="val": sample=500
-         
         
         if (sample > 0 and sample < len(self.df)):
             self.df = self.df.head(sample)
             
         if mask is not None:
-            #print("mask is not None")
             self.df = self.df[mask]
-            
-        #print(self.df.'AP/PA' == 'AP').sum()
-            
-        #print("len", len(self.df))
         
-        print('AP')
-        print((self.df[['AP/PA']] == 'AP').sum())
-        
-        print('PA')
-        print((self.df[['AP/PA']] == 'PA').sum())
-        
-        print('0')
-        print((self.df[['AP/PA']] == 0).sum())
+        if verbose and fold != None:
+            print('AP')
+            print((self.df[['AP/PA']] == 'AP').sum())
+
+            print('PA')
+            print((self.df[['AP/PA']] == 'PA').sum())
+
+            print('0')
+            print((self.df[['AP/PA']] == 0).sum())
         
 
         if not finding == "any":  # can filter for positive findings of the kind described; useful for evaluation
@@ -153,6 +143,7 @@ class CXPDataset(Dataset):
         #print(self.df)
         RESULT_PATH = "results/"
 
+
     def __len__(self):
         return len(self.df)
 
@@ -168,7 +159,7 @@ class CXPDataset(Dataset):
             image = self.transform(image)
         
         if self.fold == None:
-            return image
+            return (image, 0, self.df.index[idx])
 
         if self.orientation != 'trainer':
             label = np.zeros(len(self.PRED_LABEL), dtype=int)
@@ -187,7 +178,6 @@ class CXPDataset(Dataset):
             except:
                 print("LABEL FAILURE:", label)
                 label = 0
-            #print(label)
                 
 
-        return (image, label,self.df.index[idx])
+        return (image, label, self.df.index[idx])
