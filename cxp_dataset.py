@@ -16,8 +16,7 @@ class CXPDataset(Dataset):
             uncertain=None,
             transform=None,
             sample=0,
-            head=0,
-            tail=0,
+            mask=None,
             finding="any",
             orientation="all",
             verbose = False):
@@ -95,16 +94,22 @@ class CXPDataset(Dataset):
         if (sample > 0 and sample < len(self.df)):
             self.df = self.df.head(sample)
             
-        if head > 0:
-            num_head = int(len(self.df)*head)
-            self.df = self.df.head(num_head)
+        if mask is not None:
+            #print("mask is not None")
+            self.df = self.df[mask]
+            
+        #print(self.df.'AP/PA' == 'AP').sum()
+            
+        #print("len", len(self.df))
         
-        if tail > 0:
-            num_head = int(len(self.df)*(1-tail))
-            num_tail = len(self.df) - num_head
-            self.df = self.df.tail(num_tail)
+        print('AP')
+        print((self.df[['AP/PA']] == 'AP').sum())
         
-        #print(self.df)
+        print('PA')
+        print((self.df[['AP/PA']] == 'PA').sum())
+        
+        print('0')
+        print((self.df[['AP/PA']] == 0).sum())
         
 
         if not finding == "any":  # can filter for positive findings of the kind described; useful for evaluation

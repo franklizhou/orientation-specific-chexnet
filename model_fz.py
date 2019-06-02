@@ -407,6 +407,10 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
             verbose = True
         )
     else:
+        mask = np.random.rand(NUM_IMAGES) < .8
+        #print(mask)
+        #print(~mask)
+        
         print("Cross validating on train set")
         with open("results/logger", 'a') as logfile:
             logfile.write("Cross validating on train set\n")
@@ -422,7 +426,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
             transform=data_transforms['train'],
             orientation=orientation,
             sample = NUM_IMAGES,
-            head = HEAD,
+            mask = mask,
             verbose = True
         )
         print("On val: ", end=" ")
@@ -436,7 +440,7 @@ def train_cnn(PATH_TO_IMAGES, PATH_TO_CSV, LR, WEIGHT_DECAY, orientation='all', 
             transform=data_transforms['val'],
             orientation=orientation,
             sample = NUM_IMAGES,
-            tail = 1 - HEAD,
+            mask = ~mask,
             verbose = True
         )
         
